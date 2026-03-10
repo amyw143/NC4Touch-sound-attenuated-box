@@ -1,0 +1,12 @@
+# Audio and data files — too large for GitHub
+*.wav
+*.mat
+*.json
+
+# MATLAB temporary files
+*.asv
+*.mex*
+*.slxc
+
+# macOS system files
+.DS_Store
