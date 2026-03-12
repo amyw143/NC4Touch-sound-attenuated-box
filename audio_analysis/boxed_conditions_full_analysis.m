@@ -57,7 +57,7 @@ for c = 1:numel(cfg.conditions)
     for trial = 1:numel(windows)
         T_trial = parse_timestamp(tsStr{trial});
         extract_audio(windows{trial}, trial, cond.trimmedFile, ...
-            T_trial, cond.extractedDir, cfg.endBuffer_s);
+            T_trial, cond.extractedDir);
     end
 
     % --- Compute dB per event file ---
@@ -72,7 +72,7 @@ for c = 1:numel(cfg.conditions)
     for f = 1:nFiles
         [yEv, ~] = audioread(fullfile(cond.extractedDir, audioFiles(f).name));
         yPa      = yEv .* calibrationGain_G;
-        level_dB = 10 * log10(mean(yPa.^2) / (20e-6)^2);
+        level_dB = paToDb(yPa);
 
         results(f).fileName = audioFiles(f).name;
         results(f).level_dB = level_dB;
@@ -276,7 +276,7 @@ function event_windows = extract_event_windows(events)
     end
 end
 
-function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFolder, endBuffer_s)
+function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFolder)
     if ~isfolder(outputFolder), mkdir(outputFolder); end
 
     info         = audioinfo(audioFile);
@@ -297,7 +297,7 @@ function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFol
         end
 
         t0 = max(0,            seconds(tStartDT - fileStartTime));
-        t1 = min(durationFile, seconds(tEndDT   - fileStartTime) - endBuffer_s);
+        t1 = min(durationFile, seconds(tEndDT   - fileStartTime));
 
         if t1 <= t0
             warning('Event %s out of range or zero length', eventName);
