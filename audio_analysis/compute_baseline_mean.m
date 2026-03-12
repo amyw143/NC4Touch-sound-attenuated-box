@@ -35,8 +35,8 @@ yPa_raw      = y_raw      .* calibrationGain_G;
 yPa_filtered = y_filtered .* calibrationGain_G;
 
 % Compute dB before and after filter
-dB_raw      = paToDb(yPa_raw);
-dB_filtered = paToDb(yPa_filtered);
+dB_raw      = patodB(yPa_raw);
+dB_filtered = patodB(yPa_filtered);
 
 fprintf('dB before filter: %.2f\n', dB_raw);
 fprintf('dB after filter:  %.2f\n', dB_filtered);

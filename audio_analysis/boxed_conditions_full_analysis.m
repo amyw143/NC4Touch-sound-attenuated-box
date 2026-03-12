@@ -72,7 +72,7 @@ for c = 1:numel(cfg.conditions)
     for f = 1:nFiles
         [yEv, ~] = audioread(fullfile(cond.extractedDir, audioFiles(f).name));
         yPa      = yEv .* calibrationGain_G;
-        level_dB = paToDb(yPa);
+        level_dB = patodB(yPa);
 
         results(f).fileName = audioFiles(f).name;
         results(f).level_dB = level_dB;
