@@ -2,45 +2,22 @@
 % Runs the full audio analysis pipeline on box-closed and box-open
 % conditions, then produces a grouped bar comparison plot.
 %
-% To add more conditions, add an entry to the CONDITIONS struct below.
-% All other code runs automatically.
+% To add more conditions, edit config.m only — this script runs automatically.
 % =========================================================================
 
-%% -------------------- CONFIG (edit here only) --------------------
-% --- Conditions ---
-conditions(1).name         = 'box_closed';
-conditions(1).audioFile    = '/Users/amywong/Documents/MATLAB/nc4touch-data/data_march/phase_2_2.wav';
-conditions(1).audioStart   = datetime('2026-03-09 14:43:21.100', 'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');
-conditions(1).eventFile    = '/Users/amywong/Documents/MATLAB/nc4touch-data/data_march/phase_2_2.json';
+config;  % loads all paths and settings from config.m
 
-conditions(2).name         = 'box_open';
-conditions(2).audioFile    = '/Users/amywong/Documents/MATLAB/nc4touch-data/data_march/phase_2b_2.wav';
-conditions(2).audioStart   = datetime('2026-03-09 14:34:58.100', 'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');
-conditions(2).eventFile    = '/Users/amywong/Documents/MATLAB/nc4touch-data/data_march/phase_2b_2.json';
-
-% --- Shared settings ---
-calibPath       = '/Users/amywong/Documents/MATLAB/nc4touch-data/audio_calibration/calibration_params.mat';
-baseDir         = '/Users/amywong/Documents/MATLAB/nc4touch-data/analysis';
-audioBandFilter = [200, 90000];   % Hz
-baselineMean    = 69.40;          % dB SPL — from baseline recording
-
-% =========================================================================
 %% -------------------- LOAD CALIBRATION --------------------
-calData           = load(calibPath);
+calData           = load(cfg.calibPath);
 calibrationGain_G = calData.calibrationGain_G;
 fprintf('[INFO] Calibration gain loaded: %.6f\n', calibrationGain_G);
 
 %% -------------------- RUN PIPELINE PER CONDITION --------------------
-allStats = cell(1, numel(conditions));
+allStats = cell(1, numel(cfg.conditions));
 
-for c = 1:numel(conditions)
-    cond = conditions(c);
+for c = 1:numel(cfg.conditions)
+    cond = cfg.conditions(c);
     fprintf('\n[INFO] Processing condition: %s\n', cond.name);
-
-    % --- Paths ---
-    trimmedFile  = fullfile(baseDir, sprintf('trimmed_%s.wav',    cond.name));
-    extractedDir = fullfile(baseDir, sprintf('extracted_%s',      cond.name));
-    statsFile    = fullfile(baseDir, sprintf('%s_eventStats.mat', cond.name));
 
     % --- Load audio ---
     [y, fs] = audioread(cond.audioFile);
@@ -69,9 +46,9 @@ for c = 1:numel(conditions)
     end
 
     yTrimmed = y(nRemove+1:end, :);
-    yTrimmed = bandpass_filter_audio(yTrimmed, audioBandFilter, fs);
-    audiowrite(trimmedFile, yTrimmed, fs);
-    fprintf('[INFO] Trimmed %.3f s. Wrote: %s\n', offsetTime, trimmedFile);
+    yTrimmed = bandpass_filter_audio(yTrimmed, cfg.audioBandFilter, fs);
+    audiowrite(cond.trimmedFile, yTrimmed, fs);
+    fprintf('[INFO] Trimmed %.3f s. Wrote: %s\n', offsetTime, cond.trimmedFile);
 
     % --- Extract event windows ---
     windows = extract_event_windows(events);
@@ -79,22 +56,23 @@ for c = 1:numel(conditions)
 
     for trial = 1:numel(windows)
         T_trial = parse_timestamp(tsStr{trial});
-        extract_audio(windows{trial}, trial, trimmedFile, T_trial, extractedDir);
+        extract_audio(windows{trial}, trial, cond.trimmedFile, ...
+            T_trial, cond.extractedDir, cfg.endBuffer_s);
     end
 
     % --- Compute dB per event file ---
-    audioFiles = dir(fullfile(extractedDir, '*.wav'));
+    audioFiles = dir(fullfile(cond.extractedDir, '*.wav'));
     nFiles     = numel(audioFiles);
     if nFiles == 0
-        error('No .wav files found in %s', extractedDir);
+        error('No .wav files found in %s', cond.extractedDir);
     end
 
     results = struct('fileName', cell(1,nFiles), 'level_dB', num2cell(nan(1,nFiles)));
 
     for f = 1:nFiles
-        [yEv, fsEv] = audioread(fullfile(extractedDir, audioFiles(f).name));
-        yPa         = yEv .* calibrationGain_G;
-        level_dB    = 10 * log10(mean(yPa.^2) / (20e-6)^2);
+        [yEv, ~] = audioread(fullfile(cond.extractedDir, audioFiles(f).name));
+        yPa      = yEv .* calibrationGain_G;
+        level_dB = 10 * log10(mean(yPa.^2) / (20e-6)^2);
 
         results(f).fileName = audioFiles(f).name;
         results(f).level_dB = level_dB;
@@ -121,11 +99,11 @@ for c = 1:numel(conditions)
 
     % --- Baseline correction ---
     for i = 1:numel(eventStats)
-        eventStats(i).mean_dB_corrected = eventStats(i).mean_dB - baselineMean;
+        eventStats(i).mean_dB_corrected = eventStats(i).mean_dB - cfg.baselineMean;
     end
 
     % --- Print results ---
-    fprintf('\n[RESULTS] %s (baseline = %.2f dB)\n', cond.name, baselineMean);
+    fprintf('\n[RESULTS] %s (baseline = %.2f dB)\n', cond.name, cfg.baselineMean);
     fprintf('%-20s %10s %10s\n', 'Event', 'Abs dB', 'Rel dB');
     fprintf('%s\n', repmat('-', 1, 42));
     for i = 1:numel(eventStats)
@@ -136,8 +114,8 @@ for c = 1:numel(conditions)
     end
 
     % --- Save ---
-    save(statsFile, 'eventStats');
-    fprintf('[INFO] Saved: %s\n', statsFile);
+    save(cond.statsFile, 'eventStats');
+    fprintf('[INFO] Saved: %s\n', cond.statsFile);
 
     allStats{c} = eventStats;
 end
@@ -148,12 +126,10 @@ fprintf('\n[INFO] Generating comparison plot...\n');
 T1  = struct2table(allStats{1});
 T2  = struct2table(allStats{2});
 
-% Align events — use condition 1 event list as reference
 x   = categorical(T1.eventID);
-y   = [T1.mean_dB - baselineMean, T2.mean_dB - baselineMean];   % Nx2, relative dB
-err = [T1.std_dB, T2.std_dB];                                    % Nx2
+y   = [T1.mean_dB - cfg.baselineMean, T2.mean_dB - cfg.baselineMean];
+err = [T1.std_dB, T2.std_dB];
 
-% Paired t-test across matched events
 [~, p] = ttest(T2.mean_dB, T1.mean_dB);
 if     isnan(p),   sigLabel = 'n/a';
 elseif p < 0.001,  sigLabel = '***';
@@ -162,18 +138,16 @@ elseif p < 0.05,   sigLabel = '*';
 else,              sigLabel = 'n.s.';
 end
 
-% --- Plot ---
 figure('Position', [100 100 900 500]);
 b = bar(x, y, 'grouped');
-b(1).FaceColor = [0.2 0.6 1];   % blue  — box-closed
-b(2).FaceColor = [1 0.6 0.2];   % orange — box-open
+b(1).FaceColor = [0.2 0.6 1];
+b(2).FaceColor = [1 0.6 0.2];
 
 ylabel('Mean dB SPL (relative to baseline)');
 xtickangle(45);
 grid on;
 title('Change in Mean Sound Pressure Level by Event (dB rel. baseline)');
 
-% Error bars
 hold on;
 for k = 1:numel(b)
     xpos = b(k).XEndPoints;
@@ -187,10 +161,8 @@ for k = 1:numel(b)
     end
 end
 
-% Numeric labels above bars
 ylims  = ylim;
 yrange = range(ylims);
-labelGapFrac = 0.02;
 for k = 1:numel(b)
     xtips = b(k).XEndPoints;
     ytips = b(k).YEndPoints;
@@ -198,7 +170,7 @@ for k = 1:numel(b)
     errs  = err(:,k)';
     mask  = isfinite(vals) & isfinite(errs);
     if any(mask)
-        ylabels = ytips(mask) + errs(mask) + labelGapFrac * yrange;
+        ylabels = ytips(mask) + errs(mask) + 0.02 * yrange;
         text(xtips(mask), ylabels, string(round(vals(mask), 1)), ...
             'HorizontalAlignment', 'center', ...
             'VerticalAlignment',   'bottom', ...
@@ -206,9 +178,8 @@ for k = 1:numel(b)
     end
 end
 
-legend(b, {"box-closed", "box-open"}, 'Location', 'best');
+legend(b, {cfg.conditions.name}, 'Location', 'best');
 
-% p-value annotation
 if ~isnan(p), pstr = num2str(round(p,3));
 else,         pstr = 'NaN';
 end
@@ -224,7 +195,6 @@ fprintf('[DONE] Analysis complete.\n');
 %% =========================================================================
 
 function clean_evts = clean_events(eventFile)
-% Reads NC4Touch .json event file and parses into struct array
     raw      = fileread(eventFile);
     rawClean = regexprep(raw,      '^\s*#.*\n',                '', 'lineanchors');
     rawClean = regexprep(rawClean, '^\s*\{"header":.*?\}\s*',  '');
@@ -235,7 +205,6 @@ function clean_evts = clean_events(eventFile)
 end
 
 function T = parse_timestamp(raw)
-% Converts YYYYMMDD_HHMMSS_ffffff string to datetime
     raw   = string(raw);
     parts = split(raw, "_");
     if numel(parts) < 3
@@ -255,12 +224,11 @@ function T = parse_timestamp(raw)
     else, ms = ms + repmat("0", 1, 3 - strlength(ms));
     end
 
-    tStr = yyyy+"-"+mm+"-"+dd+" "+HH+":"+MM+":"+SS+"."+ms;
-    T    = datetime(tStr, 'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');
+    T = datetime(yyyy+"-"+mm+"-"+dd+" "+HH+":"+MM+":"+SS+"."+ms, ...
+        'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');
 end
 
 function event_windows = extract_event_windows(events)
-% Extracts per-loop event windows as cell array of Mx3 string arrays
     if isscalar(events) && (iscell(events(1).timestamp) || isstring(events(1).timestamp))
         S = string(events(1).event(:)).';
         D = string(events(1).data(:)).';
@@ -308,8 +276,7 @@ function event_windows = extract_event_windows(events)
     end
 end
 
-function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFolder)
-% Extracts per-event audio segments and saves to outputFolder
+function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFolder, endBuffer_s)
     if ~isfolder(outputFolder), mkdir(outputFolder); end
 
     info         = audioinfo(audioFile);
@@ -317,21 +284,20 @@ function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFol
     durationFile = info.Duration;
 
     for k = 1:size(trialArray,1)
-        eventName  = strtrim(string(trialArray(k,1)));
-        rawStart   = strtrim(string(trialArray(k,2)));
-        rawEnd     = strtrim(string(trialArray(k,3)));
+        eventName = strtrim(string(trialArray(k,1)));
+        rawStart  = strtrim(string(trialArray(k,2)));
+        rawEnd    = strtrim(string(trialArray(k,3)));
 
         try
-            tStartDT = datetime(parse_timestamp(rawStart));
-            tEndDT   = datetime(parse_timestamp(rawEnd));
+            tStartDT = parse_timestamp(rawStart);
+            tEndDT   = parse_timestamp(rawEnd);
         catch
             warning('Failed to parse timestamps for %s (trial %d)', eventName, trialNum);
             continue
         end
 
         t0 = max(0,            seconds(tStartDT - fileStartTime));
-        endBuffer_s = 0.4;  % trim 400ms from end to avoid next-event bleed
-        t1 = min(durationFile, seconds(tEndDT - fileStartTime) - endBuffer_s);
+        t1 = min(durationFile, seconds(tEndDT   - fileStartTime) - endBuffer_s);
 
         if t1 <= t0
             warning('Event %s out of range or zero length', eventName);
@@ -349,7 +315,6 @@ function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFol
 end
 
 function audioFiltered = bandpass_filter_audio(audioData, audioBandFilter, audioFs)
-% Applies bandpass filter to audio signal
     bpFilt = designfilt('bandpassiir', ...
         'FilterOrder',         8, ...
         'HalfPowerFrequency1', audioBandFilter(1), ...
