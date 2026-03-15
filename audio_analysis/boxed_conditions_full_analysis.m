@@ -12,6 +12,19 @@ calData           = load(cfg.calibPath);
 calibrationGain_G = calData.calibrationGain_G;
 fprintf('[INFO] Calibration gain loaded: %.6f\n', calibrationGain_G);
 
+%% -------------------- SYNC CORRECTION (box-open only) --------------------
+openIdx    = find(strcmp({cfg.conditions.name}, cfg.syncCondition), 1);
+openCond   = cfg.conditions(openIdx);
+openEvents = clean_events(openCond.eventFile);
+
+openBuzzerMatch = openEvents(strcmp({openEvents.event}, 'Buzzer60') & strcmp({openEvents.data}, 'ON'));
+openBuzzerT     = parse_timestamp(openBuzzerMatch(1).timestamp);
+
+syncError = compute_audio_correction(openCond.audioFile, openCond.audioStart, openBuzzerT);
+for c = 1:numel(cfg.conditions)
+    cfg.conditions(c).audioStart = cfg.conditions(c).audioStart - seconds(syncError);
+end
+
 %% -------------------- RUN PIPELINE PER CONDITION --------------------
 allStats = cell(1, numel(cfg.conditions));
 
@@ -27,14 +40,13 @@ for c = 1:numel(cfg.conditions)
     events = clean_events(cond.eventFile);
 
     % --- Find all StartLoop timestamps ---
-    idx = strcmp({events.event}, 'StartLoop');
-    if ~any(idx)
+    startMatches = events(strcmp({events.event}, 'StartLoop'));
+    if isempty(startMatches)
         error('No StartLoop found in %s', cond.eventFile);
     end
-    tsStr = {events(idx).timestamp};
 
     % --- Trim to first StartLoop ---
-    T0         = parse_timestamp(tsStr{1});
+    T0         = parse_timestamp(startMatches(1).timestamp);
     offsetTime = seconds(T0 - cond.audioStart);
     if offsetTime < 0
         error('Event occurs before audio start for condition: %s', cond.name);
@@ -55,9 +67,8 @@ for c = 1:numel(cfg.conditions)
     fprintf('[INFO] Found %d trial(s).\n', numel(windows));
 
     for trial = 1:numel(windows)
-        T_trial = parse_timestamp(tsStr{trial});
         extract_audio(windows{trial}, trial, cond.trimmedFile, ...
-            T_trial, cond.extractedDir);
+            T0, cond.extractedDir);
     end
 
     % --- Compute dB per event file ---
@@ -97,20 +108,18 @@ for c = 1:numel(cfg.conditions)
         'nFiles',    num2cell(countPerEvent) ...
     );
 
-    % --- Baseline correction ---
-    for i = 1:numel(eventStats)
-        eventStats(i).mean_dB_corrected = eventStats(i).mean_dB - cfg.baselineMean;
+    % Store raw per-trial dB values for per-event t-tests
+    nGroups = max(g);
+    for i = 1:nGroups
+        eventStats(i).raw_dB = Tbl.level_dB(g == i);
     end
 
     % --- Print results ---
-    fprintf('\n[RESULTS] %s (baseline = %.2f dB)\n', cond.name, cfg.baselineMean);
-    fprintf('%-20s %10s %10s\n', 'Event', 'Abs dB', 'Rel dB');
-    fprintf('%s\n', repmat('-', 1, 42));
+    fprintf('\n[RESULTS] %s\n', cond.name);
+    fprintf('%-20s %10s\n', 'Event', 'Mean dB');
+    fprintf('%s\n', repmat('-', 1, 32));
     for i = 1:numel(eventStats)
-        fprintf('%-20s %10.2f %10.2f\n', ...
-            eventStats(i).eventID, ...
-            eventStats(i).mean_dB, ...
-            eventStats(i).mean_dB_corrected);
+        fprintf('%-20s %10.2f\n', eventStats(i).eventID, eventStats(i).mean_dB);
     end
 
     % --- Save ---
@@ -120,72 +129,14 @@ for c = 1:numel(cfg.conditions)
     allStats{c} = eventStats;
 end
 
-%% -------------------- COMPARISON PLOT --------------------
-fprintf('\n[INFO] Generating comparison plot...\n');
+%% -------------------- WAVEFORMS AND SPECTROGRAMS --------------------
+plot_waveform(allStats, cfg);
+plot_spectrogram(allStats, cfg);
 
-T1  = struct2table(allStats{1});
-T2  = struct2table(allStats{2});
-
-x   = categorical(T1.eventID);
-y   = [T1.mean_dB - cfg.baselineMean, T2.mean_dB - cfg.baselineMean];
-err = [T1.std_dB, T2.std_dB];
-
-[~, p] = ttest(T2.mean_dB, T1.mean_dB);
-if     isnan(p),   sigLabel = 'n/a';
-elseif p < 0.001,  sigLabel = '***';
-elseif p < 0.01,   sigLabel = '**';
-elseif p < 0.05,   sigLabel = '*';
-else,              sigLabel = 'n.s.';
-end
-
-figure('Position', [100 100 900 500]);
-b = bar(x, y, 'grouped');
-b(1).FaceColor = [0.2 0.6 1];
-b(2).FaceColor = [1 0.6 0.2];
-
-ylabel('Mean dB SPL (relative to baseline)');
-xtickangle(45);
-grid on;
-title('Change in Mean Sound Pressure Level by Event (dB rel. baseline)');
-
-hold on;
-for k = 1:numel(b)
-    xpos = b(k).XEndPoints;
-    ytip = b(k).YEndPoints;
-    errs = err(:,k)';
-    mask = isfinite(ytip) & isfinite(errs);
-    if any(mask)
-        er = errorbar(xpos(mask), ytip(mask), errs(mask), errs(mask), ...
-            'LineStyle', 'none', 'Color', [0 0 0], 'CapSize', 8, 'LineWidth', 1);
-        uistack(er, 'bottom');
-    end
-end
-
-ylims  = ylim;
-yrange = range(ylims);
-for k = 1:numel(b)
-    xtips = b(k).XEndPoints;
-    ytips = b(k).YEndPoints;
-    vals  = b(k).YData;
-    errs  = err(:,k)';
-    mask  = isfinite(vals) & isfinite(errs);
-    if any(mask)
-        ylabels = ytips(mask) + errs(mask) + 0.02 * yrange;
-        text(xtips(mask), ylabels, string(round(vals(mask), 1)), ...
-            'HorizontalAlignment', 'center', ...
-            'VerticalAlignment',   'bottom', ...
-            'FontSize', 9);
-    end
-end
-
-legend(b, {cfg.conditions.name}, 'Location', 'best');
-
-if ~isnan(p), pstr = num2str(round(p,3));
-else,         pstr = 'NaN';
-end
-ylim([ylims(1), ylims(2) + 0.14 * yrange]);
-text(0.5, 0.98, sprintf('Paired t-test: p=%s %s', pstr, sigLabel), ...
-    'Units', 'normalized', 'HorizontalAlignment', 'center', 'FontWeight', 'bold');
-hold off;
-
+%% -------------------- COMPARISON PLOTS --------------------
+fprintf('\n[INFO] Generating comparison plots...\n');
+ 
+plot_attenuation(eventIDs, attenuation, sigStars, cohensD);
+plot_comparison(T1, T2, {cfg.conditions.name}, sigStars);
+ 
 fprintf('[DONE] Analysis complete.\n');

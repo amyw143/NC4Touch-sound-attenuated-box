@@ -30,6 +30,7 @@ cfg.conditions(2).audioFile  = 'phase_2b_2.wav';       % filename only
 cfg.conditions(2).audioStart = datetime('2026-03-09 14:34:58.100', ...
                                    'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');  % from Audacity
 cfg.conditions(2).eventFile  = 'phase_2b_2.json';      % filename only
+cfg.syncCondition = 'box_open';
 
 %% -------------------------------------------------------------------------
 %% AUTOMATIC — do not edit below this line
