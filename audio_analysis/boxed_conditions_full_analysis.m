@@ -26,7 +26,8 @@ for c = 1:numel(cfg.conditions)
 end
 
 %% -------------------- RUN PIPELINE PER CONDITION --------------------
-allStats = cell(1, numel(cfg.conditions));
+allStats       = cell(1, numel(cfg.conditions));
+allEventTiming = cell(1, numel(cfg.conditions));
 
 for c = 1:numel(cfg.conditions)
     cond = cfg.conditions(c);
@@ -114,6 +115,20 @@ for c = 1:numel(cfg.conditions)
         eventStats(i).raw_dB = Tbl.level_dB(g == i);
     end
 
+    % Store event timing relative to T0 for waveform/spectrogram plotting
+    % Each entry: {eventName, tStart, tEnd} relative to trimmed audio start
+    eventTiming = {};
+    for trial = 1:numel(windows)
+        trialWin = windows{trial};
+        for k = 1:size(trialWin, 1)
+            evName  = strtrim(string(trialWin(k,1)));
+            tStart  = seconds(parse_timestamp(strtrim(string(trialWin(k,2)))) - T0);
+            tEnd    = seconds(parse_timestamp(strtrim(string(trialWin(k,3)))) - T0);
+            eventTiming{end+1} = {char(evName), tStart, tEnd};
+        end
+    end
+    allEventTiming{c} = eventTiming;
+
     % --- Print results ---
     fprintf('\n[RESULTS] %s\n', cond.name);
     fprintf('%-20s %10s\n', 'Event', 'Mean dB');
@@ -129,14 +144,52 @@ for c = 1:numel(cfg.conditions)
     allStats{c} = eventStats;
 end
 
-%% -------------------- WAVEFORMS AND SPECTROGRAMS --------------------
-plot_waveform(allStats, cfg);
-plot_spectrogram(allStats, cfg);
+%% -------------------- COMPARISON PLOT --------------------
+%% -------------------- COMPARISON PLOT --------------------
+fprintf('\n[INFO] Generating comparison plot...\n');
 
-%% -------------------- COMPARISON PLOTS --------------------
-fprintf('\n[INFO] Generating comparison plots...\n');
- 
+condNames   = {cfg.conditions.name};
+openIdx2    = find(strcmp(condNames, 'box_open'),        1);
+closedIdx   = find(strcmp(condNames, 'box_closed'),       1);
+
+T_closed = struct2table(allStats{closedIdx});
+T_open   = struct2table(allStats{openIdx2});
+
+nEvents     = numel(allStats{closedIdx});
+eventIDs    = {allStats{closedIdx}.eventID};
+attenuation = T_open.mean_dB - T_closed.mean_dB;
+
+% --- Per-event paired t-test + Cohen's d (box_open vs box_closed) ---
+pVals    = nan(nEvents, 1);
+cohensD  = nan(nEvents, 1);
+sigStars = cell(nEvents, 1);
+for i = 1:nEvents
+    raw_closed = allStats{closedIdx}(i).raw_dB;
+    raw_open   = allStats{openIdx2}(i).raw_dB;
+    [~, pVals(i)] = ttest(raw_open, raw_closed);
+    d          = raw_open - raw_closed;
+    cohensD(i) = mean(d) / std(d);
+    if     isnan(pVals(i)),   sigStars{i} = 'n/a';
+    elseif pVals(i) < 0.001,  sigStars{i} = '***';
+    elseif pVals(i) < 0.01,   sigStars{i} = '**';
+    elseif pVals(i) < 0.05,   sigStars{i} = '*';
+    else,                     sigStars{i} = 'n.s.';
+    end
+end
+
+% --- Print attenuation table ---
+fprintf('\n[ATTENUATION] box_open vs box_closed\n');
+fprintf('%-20s %10s %10s %10s %10s %6s\n', 'Event', 'Open dB', 'Closed dB', 'Delta dB', 'Cohen d', 'Sig');
+fprintf('%s\n', repmat('-', 1, 70));
+for i = 1:nEvents
+    fprintf('%-20s %10.2f %10.2f %10.2f %10.2f %6s\n', ...
+        eventIDs{i}, T_open.mean_dB(i), T_closed.mean_dB(i), attenuation(i), cohensD(i), sigStars{i});
+end
+
 plot_attenuation(eventIDs, attenuation, sigStars, cohensD);
-plot_comparison(T1, T2, {cfg.conditions.name}, sigStars);
- 
+allStatsTables = cellfun(@struct2table, allStats, 'UniformOutput', false);
+plot_comparison(allStatsTables, condNames, sigStars);
+plot_waveform(cfg, allEventTiming);
+plot_spectrogram(cfg, allEventTiming);
+
 fprintf('[DONE] Analysis complete.\n');

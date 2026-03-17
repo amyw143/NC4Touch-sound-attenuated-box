@@ -1,51 +1,74 @@
-function plot_spectrogram(allStats, cfg)
-% PLOT_SPECTROGRAM  Plots spectrogram for trial 1 of each event, one figure
-% per condition, with one subplot per event.
+function plot_spectrogram(cfg, allEventTiming)
+% PLOT_SPECTROGRAM  Plots full trimmed audio spectrogram per condition,
+% stacked vertically with shared x-axis, aligned by first Buzzer60 onset.
 %
 % INPUTS:
-%   allStats - cell array of eventStats structs from main script
-%   cfg      - config struct with cfg.conditions(c).extractedDir and .name
+%   cfg            - config struct with cfg.conditions(c).trimmedFile and .name
+%   allEventTiming - cell array (one per condition) of event timing structs
+%                    each entry: {eventName, tStart, tEnd}
 
-    eventIDs = {allStats{1}.eventID};
-    nEvents  = numel(eventIDs);
-    nConds   = numel(cfg.conditions);
+    nConds = numel(cfg.conditions);
 
     % --- Spectrogram settings ---
-    winSamples = 4096;
-    overlap    = round(winSamples * 0.75);
+    winSamples = 2048;
+    overlap    = round(winSamples * 0.50);
     nfft       = winSamples;
 
-    % --- Layout ---
-    nCols = 3;
-    nRows = ceil(nEvents / nCols);
+    % --- Find shortest trimmed audio duration ---
+    minDuration = inf;
+    for c = 1:nConds
+        info = audioinfo(cfg.conditions(c).trimmedFile);
+        minDuration = min(minDuration, info.Duration);
+    end
+
+    % --- Plot ---
+    figure('Position', [100 100 1400 900]);
 
     for c = 1:nConds
-        figure('Position', [100 100 1200 300*nRows]);
-        sgtitle(sprintf('Spectrogram — %s (Trial 1)', strrep(cfg.conditions(c).name, '_', '\_')));
+        [y, fs] = audioread(cfg.conditions(c).trimmedFile);
+        if size(y, 2) > 1, y = mean(y, 2); end
+        targetFs = 44100; % Downsample for computational speed
+        y  = resample(y, targetFs, fs);
+        fs = targetFs;
 
-        for i = 1:nEvents
-            extractedDir = cfg.conditions(c).extractedDir;
-            eventName    = eventIDs{i};
+        ax = subplot(nConds, 1, c);
+        
+        [~, f, t, p] = spectrogram(y, winSamples, overlap, nfft, fs);
+        imagesc(ax, t, f/1000, 10*log10(p));
+        axis(ax, 'xy');
+        colormap(ax, 'turbo');
+        clim(ax, [-120 -40]);
+        xlim(ax, [0 minDuration]);
 
-            % Load trial 1
-            fname = fullfile(extractedDir, sprintf('%s_trial1.wav', eventName));
-            if ~isfile(fname)
-                warning('File not found: %s', fname);
-                continue;
+        % Mark Buzzer60 event windows
+        hold(ax, 'on');
+        for k = 1:numel(allEventTiming{c})
+            if strcmp(allEventTiming{c}{k}{1}, 'Buzzer60')
+                tStart = allEventTiming{c}{k}{2};
+                tEnd   = allEventTiming{c}{k}{3};
+                xline(ax, tStart, 'w--', 'LineWidth', 1, 'HandleVisibility', 'off');
+                xline(ax, tEnd,   'w:',  'LineWidth', 1, 'HandleVisibility', 'off');
             end
-            [y, fs] = audioread(fname);
-            if size(y, 2) > 1, y = mean(y, 2); end
+        end
+        hold(ax, 'off');
 
-            ax = subplot(nRows, nCols, i);
-            spectrogram(y, winSamples, overlap, nfft, fs, 'yaxis');
-            title(ax, strrep(eventName, '_', '\_'));
+        ylim(ax, [0.2 fs/2000]);  % 0.2kHz to Nyquist in kHz
+        ylabel(ax, 'Frequency (kHz)');
+        title(ax, strrep(cfg.conditions(c).name, '_', ' '));
+        ylabel(ax, 'Frequency (kHz)');
+        if c == nConds
             xlabel(ax, 'Time (s)');
-            ylabel(ax, 'Frequency (kHz)');
-
-            % Limit colorbar range for consistency across subplots
-            clim(ax, [-120 -40]);
         end
 
-        colormap('jet');
+        % A/B/C label
+        text(ax, 0.01, 0.95, char('A' + c - 1), ...
+            'Units', 'normalized', ...
+            'FontSize', 14, ...
+            'FontWeight', 'bold', ...
+            'VerticalAlignment', 'top', ...
+            'Color', 'white');
     end
+
+    linkaxes(findall(gcf, 'Type', 'axes'), 'x');
+    sgtitle('Full Session Spectrogram by Condition');
 end

@@ -1,21 +1,24 @@
-function plot_comparison(T1, T2, conditionNames, sigStars)
+function plot_comparison(allStatsTables, conditionNames, sigStars)
 % PLOT_COMPARISON  Grouped bar plot of absolute mean dB SPL per event and
 % condition, with error bars and significance stars.
 %
 % INPUTS:
-%   T1             - struct2table output for condition 1 (box_closed)
-%   T2             - struct2table output for condition 2 (box_open)
+%   allStatsTables - struct2table output of stats for all conditions
 %   conditionNames - cell array of condition name strings (e.g. {'box_closed','box_open'})
 %   sigStars       - cell array of significance strings per event
 
+    T1     = allStatsTables{1};
     x      = categorical(T1.eventID);
-    yGrp   = [T1.mean_dB, T2.mean_dB];
-    errGrp = [T1.std_dB,  T2.std_dB];
+    nConds = numel(allStatsTables);
+    yGrp   = cell2mat(cellfun(@(T) T.mean_dB, allStatsTables, 'UniformOutput', false));
+    errGrp = cell2mat(cellfun(@(T) T.std_dB,  allStatsTables, 'UniformOutput', false));
 
     figure('Position', [100 100 900 500]);
     bg = bar(x, yGrp, 'grouped');
-    bg(1).FaceColor = [0.2 0.6 1];
-    bg(2).FaceColor = [1 0.6 0.2];
+    cmap = colormap('turbo');
+    for k = 1:nConds
+       bg(k).FaceColor = cmap(round((k-1)*(255/(nConds-1)) + 1), :);
+    end
 
     ylabel('Mean dB SPL');
     xtickangle(45);
@@ -23,7 +26,7 @@ function plot_comparison(T1, T2, conditionNames, sigStars)
     title('Mean Sound Pressure Level by Event and Condition');
 
     hold on;
-    for k = 1:2
+    for k = 1:nConds
         xpos = bg(k).XEndPoints;
         ytip = bg(k).YEndPoints;
         errs = errGrp(:,k)';

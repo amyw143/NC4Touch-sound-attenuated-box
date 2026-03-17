@@ -32,6 +32,12 @@ cfg.conditions(2).audioStart = datetime('2026-03-09 14:34:58.100', ...
 cfg.conditions(2).eventFile  = 'phase_2b_2.json';      % filename only
 cfg.syncCondition = 'box_open';
 
+% --- Condition 3: Internal Sound ---
+cfg.conditions(3).name = 'internal_sound'; 
+cfg.conditions(3).audioFile = 'internal_sound_chamber_4.wav'; 
+cfg.conditions(3).audioStart = datetime('2026-03-13 09:08:53.100', ...
+                                   'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');  % from Audacity
+cfg.conditions(3).eventFile  = 'internal_sound_chamber_4.json'; 
 %% -------------------------------------------------------------------------
 %% AUTOMATIC — do not edit below this line
 %% -------------------------------------------------------------------------
