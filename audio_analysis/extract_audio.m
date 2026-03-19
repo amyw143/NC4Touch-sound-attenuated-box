@@ -1,10 +1,9 @@
 
-function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFolder)
+function extract_audio(trialArray, trialNum, audioFile, audioStart, outputFolder)
     if ~isfolder(outputFolder), mkdir(outputFolder); end
 
-    info         = audioinfo(audioFile);
-    fs           = info.SampleRate;
-    durationFile = info.Duration;
+    [y, fs] = audioread(audioFile);
+    audio_ts = seconds((0:length(y)-1) / fs) + audioStart;
 
     for k = 1:size(trialArray,1)
         eventName = strtrim(string(trialArray(k,1)));
@@ -19,18 +18,13 @@ function extract_audio(trialArray, trialNum, audioFile, fileStartTime, outputFol
             continue
         end
 
-        t0 = max(0,            seconds(tStartDT - fileStartTime));
-        t1 = min(durationFile, seconds(tEndDT   - fileStartTime));
-
-        if t1 <= t0
+        idx = audio_ts >= tStartDT & audio_ts < tEndDT;
+        if ~any(idx)
             warning('Event %s out of range or zero length', eventName);
             continue
         end
-
-        startSample = floor(t0*fs) + 1;
-        endSample   = min(ceil(t1*fs), ceil(durationFile*fs));
-        ySeg        = audioread(audioFile, [startSample endSample]);
-
+        ySeg = y(idx, :);
+        
         outName = sprintf('%s_trial%d.wav', regexprep(eventName,'[^\w-]','_'), trialNum);
         audiowrite(fullfile(outputFolder, outName), ySeg, fs);
     end

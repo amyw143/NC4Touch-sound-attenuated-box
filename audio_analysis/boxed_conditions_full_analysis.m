@@ -41,35 +41,19 @@ for c = 1:numel(cfg.conditions)
     events = clean_events(cond.eventFile);
 
     % --- Find all StartLoop timestamps ---
+    T0 = parse_timestamp(startMatches(1).timestamp);
     startMatches = events(strcmp({events.event}, 'StartLoop'));
     if isempty(startMatches)
         error('No StartLoop found in %s', cond.eventFile);
     end
-
-    % --- Trim to first StartLoop ---
-    T0         = parse_timestamp(startMatches(1).timestamp);
-    offsetTime = seconds(T0 - cond.audioStart);
-    if offsetTime < 0
-        error('Event occurs before audio start for condition: %s', cond.name);
-    end
-
-    nRemove = round(offsetTime * fs);
-    if nRemove >= size(y,1)
-        error('Offset longer than audio duration for condition: %s', cond.name);
-    end
-
-    yTrimmed = y(nRemove+1:end, :);
-    yTrimmed = bandpass_filter_audio(yTrimmed, cfg.audioBandFilter, fs);
-    audiowrite(cond.trimmedFile, yTrimmed, fs);
-    fprintf('[INFO] Trimmed %.3f s. Wrote: %s\n', offsetTime, cond.trimmedFile);
 
     % --- Extract event windows ---
     windows = extract_event_windows(events);
     fprintf('[INFO] Found %d trial(s).\n', numel(windows));
 
     for trial = 1:numel(windows)
-        extract_audio(windows{trial}, trial, cond.trimmedFile, ...
-            T0, cond.extractedDir);
+        extract_audio(windows{trial}, trial, cond.audioFile, ...
+            cond.audioStart, cond.extractedDir);
     end
 
     % --- Compute dB per event file ---
