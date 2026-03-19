@@ -20,9 +20,13 @@ openEvents = clean_events(openCond.eventFile);
 openBuzzerMatch = openEvents(strcmp({openEvents.event}, 'Buzzer60') & strcmp({openEvents.data}, 'ON'));
 openBuzzerT     = parse_timestamp(openBuzzerMatch(1).timestamp);
 
-syncError = compute_audio_correction(openCond.audioFile, openCond.audioStart, openBuzzerT);
 for c = 1:numel(cfg.conditions)
-    cfg.conditions(c).audioStart = cfg.conditions(c).audioStart - seconds(syncError);
+    cond        = cfg.conditions(c);
+    condEvents  = clean_events(cond.eventFile);
+    buzzerMatch = condEvents(strcmp({condEvents.event}, 'Buzzer60') & strcmp({condEvents.data}, 'ON'));
+    buzzerT     = parse_timestamp(buzzerMatch(1).timestamp);
+    syncError   = compute_audio_correction(cond.audioFile, cond.audioStart, buzzerT);
+    cfg.conditions(c).audioStart = cond.audioStart - seconds(syncError);
 end
 
 %% -------------------- RUN PIPELINE PER CONDITION --------------------
