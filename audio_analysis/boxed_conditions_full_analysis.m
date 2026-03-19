@@ -12,19 +12,6 @@ calData           = load(cfg.calibPath);
 calibrationGain_G = calData.calibrationGain_G;
 fprintf('[INFO] Calibration gain loaded: %.6f\n', calibrationGain_G);
 
-%% -------------------- SYNC CORRECTION (box-open only) --------------------
-openIdx    = find(strcmp({cfg.conditions.name}, cfg.syncCondition), 1);
-openCond   = cfg.conditions(openIdx);
-openEvents = clean_events(openCond.eventFile);
-
-openBuzzerMatch = openEvents(strcmp({openEvents.event}, 'Buzzer60') & strcmp({openEvents.data}, 'ON'));
-openBuzzerT     = parse_timestamp(openBuzzerMatch(1).timestamp);
-
-syncError = compute_audio_correction(openCond.audioFile, openCond.audioStart, openBuzzerT);
-for c = 1:numel(cfg.conditions)
-    cfg.conditions(c).audioStart = cfg.conditions(c).audioStart - seconds(syncError);
-end
-
 %% -------------------- RUN PIPELINE PER CONDITION --------------------
 allStats       = cell(1, numel(cfg.conditions));
 allEventTiming = cell(1, numel(cfg.conditions));
