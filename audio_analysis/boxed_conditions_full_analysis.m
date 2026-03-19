@@ -21,6 +21,9 @@ openBuzzerMatch = openEvents(strcmp({openEvents.event}, 'Buzzer60') & strcmp({op
 openBuzzerT     = parse_timestamp(openBuzzerMatch(1).timestamp);
 
 for c = 1:numel(cfg.conditions)
+    if strcmp(cfg.conditions(c).name, 'box_closed')
+        continue
+    end
     cond        = cfg.conditions(c);
     condEvents  = clean_events(cond.eventFile);
     buzzerMatch = condEvents(strcmp({condEvents.event}, 'Buzzer60') & strcmp({condEvents.data}, 'ON'));
