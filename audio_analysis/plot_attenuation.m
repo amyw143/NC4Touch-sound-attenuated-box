@@ -16,9 +16,9 @@ function plot_attenuation(eventIDs, attenuation, sigStars, cohensD)
     b.FaceColor = 'flat';
     for i = 1:nEvents
         if attenuation(i) > 0
-            b.CData(i,:) = [1 0.6 0.2];
+            b.CData(i,:) = [0.25 0.60 0.95];  % medium blue — positive (open louder)
         else
-            b.CData(i,:) = [0.2 0.6 1];
+            b.CData(i,:) = [0.85 0.92 1.00];  % light blue  — negative
         end
     end
 

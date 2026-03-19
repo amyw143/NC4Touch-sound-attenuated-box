@@ -14,10 +14,14 @@ function plot_comparison(allStatsTables, conditionNames, sigStars)
     errGrp = cell2mat(cellfun(@(T) T.std_dB,  allStatsTables, 'UniformOutput', false));
 
     figure('Position', [100 100 900 500]);
+    condColors = [
+        0.85  0.92  1.00;   % light blue    — box_closed
+        0.25  0.60  0.95;   % medium blue   — box_open
+        0.05  0.20  0.60;   % deep navy     — internal_sound
+        ];
     bg = bar(x, yGrp, 'grouped');
-    cmap = colormap('turbo');
     for k = 1:nConds
-       bg(k).FaceColor = cmap(round((k-1)*(255/(nConds-1)) + 1), :);
+        bg(k).FaceColor = condColors(k,:);
     end
 
     ylabel('Mean dB SPL');
