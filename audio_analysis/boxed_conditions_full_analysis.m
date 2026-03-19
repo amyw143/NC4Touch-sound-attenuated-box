@@ -41,11 +41,11 @@ for c = 1:numel(cfg.conditions)
     events = clean_events(cond.eventFile);
 
     % --- Find all StartLoop timestamps ---
-    T0 = parse_timestamp(startMatches(1).timestamp);
     startMatches = events(strcmp({events.event}, 'StartLoop'));
     if isempty(startMatches)
         error('No StartLoop found in %s', cond.eventFile);
     end
+    T0 = parse_timestamp(startMatches(1).timestamp);
 
     % --- Extract event windows ---
     windows = extract_event_windows(events);
