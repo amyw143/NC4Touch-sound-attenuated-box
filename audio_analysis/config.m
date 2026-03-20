@@ -20,7 +20,7 @@ projectRoot = '/Users/amywong/Documents/MATLAB/nc4touch-data';
 % --- Condition 1: Box Closed ---
 cfg.conditions(1).name       = 'box_closed';
 cfg.conditions(1).audioFile  = 'phase_2_2.wav';        % filename only
-cfg.conditions(1).audioStart = datetime('2026-03-09 14:43:21.100', ...
+cfg.conditions(1).audioStart = datetime('2026-03-09 14:43:12.100', ...
                                    'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');  % from Audacity
 cfg.conditions(1).eventFile  = 'phase_2_2.json';       % filename only
 
