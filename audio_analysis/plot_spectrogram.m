@@ -1,4 +1,4 @@
-function plot_spectrogram(cfg, allEventTiming)
+function plot_spectrogram(cfg, allEventTiming, allT0)
 % PLOT_SPECTROGRAM  Plots full trimmed audio spectrogram per condition,
 % stacked vertically with shared x-axis, aligned by first Buzzer60 onset.
 %

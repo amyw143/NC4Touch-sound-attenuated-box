@@ -1,58 +1,54 @@
-function plot_waveform(cfg, allEventTiming)
-% PLOT_WAVEFORM  Plots full trimmed waveform for each condition overlaid,
-% with shaded regions for each event window across all trials.
+function plot_waveform(cfg, allT0)
+% PLOT_WAVEFORM  Plots full session waveform per condition from raw audio,
+% stacked vertically with shared x-axis, trimmed to shortest clip from T0.
 %
 % INPUTS:
-%   cfg            - config struct with cfg.conditions(c).trimmedFile and .name
-%   allEventTiming - cell array (one per condition) of event timing structs
-%                    each entry: {eventName, tStart, tEnd}
-
-    nConds     = numel(cfg.conditions);
-
-    % --- Plot waveform per condition ---
-    figure('Position', [100 100 1400 900]);
-
-    % Find shortest trimmed audio duration
+%   cfg            - config struct with cfg.conditions(c).audioFile and .name
+%   allEventTiming - cell array of event timing structs per condition (unused, reserved)
+%   allT0          - cell array of T0 datetimes per condition
+ 
+    nConds = numel(cfg.conditions);
+ 
+    condColors = [
+        0.45  0.70  0.95;   % light blue  — box_closed
+        0.25  0.60  0.95;   % medium blue — box_open
+        0.05  0.20  0.60;   % deep navy   — internal_sound
+    ];
+ 
+    % --- Find shortest duration from T0 ---
     minDuration = inf;
     for c = 1:nConds
-        info = audioinfo(cfg.conditions(c).trimmedFile);
-        minDuration = min(minDuration, info.Duration);
+        [y, fs]  = audioread(cfg.conditions(c).audioFile);
+        audio_ts = seconds((0:length(y)-1) / fs) + cfg.conditions(c).audioStart;
+        minDuration = min(minDuration, seconds(audio_ts(end) - allT0{c}));
     end
-
-    % Find first Buzzer60 onset per condition
-    buzzerOnsets = nan(1, nConds);
+ 
+    % --- Plot ---
+    figure('Position', [100 100 1400 900]);
+ 
     for c = 1:nConds
-        for k = 1:numel(allEventTiming{c})
-            if strcmp(allEventTiming{c}{k}{1}, 'Buzzer60')
-                buzzerOnsets(c) = allEventTiming{c}{k}{2};
-                break;
-            end
-        end
-    end
-    tRef = min(buzzerOnsets);  % align to earliest onset
-
-    for c = 1:nConds
-        [y, fs] = audioread(cfg.conditions(c).trimmedFile);
+        [y, fs] = audioread(cfg.conditions(c).audioFile);
         if size(y, 2) > 1, y = mean(y, 2); end
-        tShift = buzzerOnsets(c) - tRef;
-        tAxis  = (0:length(y)-1) / fs - tShift;
-
+ 
+        audio_ts = seconds((0:length(y)-1) / fs) + cfg.conditions(c).audioStart;
+        mask     = audio_ts >= allT0{c};
+        tAxis    = seconds(audio_ts(mask) - allT0{c});
+        y        = y(mask);
+ 
         ax = subplot(nConds, 1, c);
-        plot(tAxis, y, 'Color', [0.3 0.4 0.8], 'LineWidth', 0.5);
+        plot(tAxis, y, 'Color', condColors(c,:), 'LineWidth', 0.5);
         title(ax, strrep(cfg.conditions(c).name, '_', ' '));
-        text(ax, 0.01, 0.95, char('A' + c - 1), ...
-            'Units', 'normalized', ...
-            'FontSize', 14, ...
-            'FontWeight', 'bold', ...
-            'VerticalAlignment', 'top');
         ylabel(ax, 'Amplitude');
-        ylim(ax, [-1 1]);  % consistent y-axis across panels
-        xlim(ax, [-tShift, minDuration - tShift]);
+        ylim(ax, [-1 1]);
+        xlim(ax, [0 minDuration]);
         grid(ax, 'on');
-        if c == nConds
-            xlabel(ax, 'Time (s)');
-        end
+        text(ax, 0.01, 0.95, char('A' + c - 1), ...
+            'Units', 'normalized', 'FontSize', 14, ...
+            'FontWeight', 'bold', 'VerticalAlignment', 'top');
+ 
+        if c == nConds, xlabel(ax, 'Time (s)'); end
     end
-    linkaxes(findall(gcf, 'Type', 'axes'), 'x');  % shared x-axis
+ 
+    linkaxes(findall(gcf, 'Type', 'axes'), 'x');
     sgtitle('Full Session Waveform by Condition');
-
+end

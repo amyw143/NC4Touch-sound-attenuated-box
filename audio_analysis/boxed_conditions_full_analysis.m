@@ -35,6 +35,7 @@ end
 %% -------------------- RUN PIPELINE PER CONDITION --------------------
 allStats       = cell(1, numel(cfg.conditions));
 allEventTiming = cell(1, numel(cfg.conditions));
+allT0 = cell(1, numel(cfg.conditions));
 
 for c = 1:numel(cfg.conditions)
     cond = cfg.conditions(c);
@@ -53,6 +54,7 @@ for c = 1:numel(cfg.conditions)
         error('No StartLoop found in %s', cond.eventFile);
     end
     T0 = parse_timestamp(startMatches(1).timestamp);
+    allT0{c} = T0;
 
     % --- Extract event windows ---
     windows = extract_event_windows(events);
@@ -168,7 +170,7 @@ for i = 1:nEvents
 end
 
 % --- Print attenuation table ---
-fprintf('\n[ATTENUATION] box_open vs box_closed\n');
+fprintf('\n[ATTENUATION] box_open vspl box_closed\n');
 fprintf('%-20s %10s %10s %10s %10s %6s\n', 'Event', 'Open dB', 'Closed dB', 'Delta dB', 'Cohen d', 'Sig');
 fprintf('%s\n', repmat('-', 1, 70));
 for i = 1:nEvents
@@ -179,7 +181,7 @@ end
 plot_attenuation(eventIDs, attenuation, sigStars, cohensD);
 allStatsTables = cellfun(@struct2table, allStats, 'UniformOutput', false);
 plot_comparison(allStatsTables, condNames, sigStars);
-plot_waveform(cfg, allEventTiming);
-plot_spectrogram(cfg, allEventTiming);
+plot_waveform(cfg, allT0);                                      
+plot_spectrogram(cfg, allEventTiming, allT0);
 
 fprintf('[DONE] Analysis complete.\n');
