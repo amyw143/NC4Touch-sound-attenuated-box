@@ -24,7 +24,9 @@ function plot_attenuation(eventIDs, attenuation, sigStars, cohensD)
 
     ylabel('Attenuation (dB): box\_open - box\_closed');
     xtickangle(45);
-    grid on;
+    ax = gca;
+    ax.XGrid = "off"; % No vertical lines
+    ax.YGrid = "on"; 
     title('Sound Attenuation by Event: Box Open vs Box Closed');
 
     hold on;

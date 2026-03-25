@@ -13,13 +13,6 @@ calibrationGain_G = calData.calibrationGain_G;
 fprintf('[INFO] Calibration gain loaded: %.6f\n', calibrationGain_G);
 
 %% -------------------- SYNC CORRECTION (box-open only) --------------------
-openIdx    = find(strcmp({cfg.conditions.name}, cfg.syncCondition), 1);
-openCond   = cfg.conditions(openIdx);
-openEvents = clean_events(openCond.eventFile);
-
-openBuzzerMatch = openEvents(strcmp({openEvents.event}, 'Buzzer60') & strcmp({openEvents.data}, 'ON'));
-openBuzzerT     = parse_timestamp(openBuzzerMatch(1).timestamp);
-
 for c = 1:numel(cfg.conditions)
     if strcmp(cfg.conditions(c).name, 'box_closed')
         continue
@@ -151,36 +144,18 @@ nEvents     = numel(allStats{closedIdx});
 eventIDs    = {allStats{closedIdx}.eventID};
 attenuation = T_open.mean_dB - T_closed.mean_dB;
 
-% --- Per-event paired t-test + Cohen's d (box_open vs box_closed) ---
-pVals    = nan(nEvents, 1);
-cohensD  = nan(nEvents, 1);
-sigStars = cell(nEvents, 1);
-for i = 1:nEvents
-    raw_closed = allStats{closedIdx}(i).raw_dB;
-    raw_open   = allStats{openIdx2}(i).raw_dB;
-    [~, pVals(i)] = ttest(raw_open, raw_closed);
-    d          = raw_open - raw_closed;
-    cohensD(i) = mean(d) / std(d);
-    if     isnan(pVals(i)),   sigStars{i} = 'n/a';
-    elseif pVals(i) < 0.001,  sigStars{i} = '***';
-    elseif pVals(i) < 0.01,   sigStars{i} = '**';
-    elseif pVals(i) < 0.05,   sigStars{i} = '*';
-    else,                     sigStars{i} = 'n.s.';
-    end
-end
-
 % --- Print attenuation table ---
 fprintf('\n[ATTENUATION] box_open vspl box_closed\n');
-fprintf('%-20s %10s %10s %10s %10s %6s\n', 'Event', 'Open dB', 'Closed dB', 'Delta dB', 'Cohen d', 'Sig');
+fprintf('%-20s %10s %10s %10s %10s %6s\n', 'Event', 'Open dB', 'Closed dB', 'Delta dB');
 fprintf('%s\n', repmat('-', 1, 70));
 for i = 1:nEvents
     fprintf('%-20s %10.2f %10.2f %10.2f %10.2f %6s\n', ...
-        eventIDs{i}, T_open.mean_dB(i), T_closed.mean_dB(i), attenuation(i), cohensD(i), sigStars{i});
+        eventIDs{i}, T_open.mean_dB(i), T_closed.mean_dB(i), attenuation(i));
 end
 
 plot_attenuation(eventIDs, attenuation, sigStars, cohensD);
 allStatsTables = cellfun(@struct2table, allStats, 'UniformOutput', false);
-plot_comparison(allStatsTables, condNames, sigStars);
+plot_comparison(allStatsTables, condNames);
 plot_waveform(cfg, allT0);                                      
 plot_spectrogram(cfg, allEventTiming, allT0);
 
