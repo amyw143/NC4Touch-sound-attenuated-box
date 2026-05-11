@@ -41,7 +41,7 @@ function plot_comparison(allStatsTables, condNames)
     title('Mean Sound Pressure Level by Event and Condition');
 
     hold on;
-    yline(baseline, '-', 'Baseline');
+    yline(baseline, '--', 'Baseline');
     for k = 1:nConds
         xpos = bg(k).XEndPoints;
         ytip = bg(k).YEndPoints;
