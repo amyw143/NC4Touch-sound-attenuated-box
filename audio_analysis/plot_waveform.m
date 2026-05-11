@@ -1,16 +1,19 @@
 function plot_waveform(cfg, allT0)
+% PLOT_WAVEFORM Waveform plot depicting full session sound amplitudes.
+% INPUTS:
+%   cfg: config file for audio location
+%   allT0: time stamps for event alignment
+
     nConds     = numel(cfg.conditions);
     condColors = [
         0.45  0.70  0.95;
         0.25  0.60  0.95;
         0.05  0.20  0.60;
     ];
-
     zoomYLims = [-0.1  0.1;
                  -0.1  0.1];
-
-    zoomStart = 275;
-    zoomEnd   = 310;
+    zoomStart = 285;
+    zoomEnd   = 315;
 
     % --- Cache audio ---
     minDuration = inf;
@@ -71,22 +74,31 @@ function plot_waveform(cfg, allT0)
             'EdgeColor', 'none');
         hold(ax, 'off');
 
-        % Convert zoom x-range to normalized figure units using main ax
-        axPos  = get(ax, 'Position');       % [left bottom width height] normalized
+        % Get main axes position and limits
+        axPos    = get(ax, 'Position');
         xLimMain = xlim(ax);
+        yLimMain = ylim(ax);
 
-        % Fraction of x-axis occupied by zoom window
-        xFracStart = (zoomStart - xLimMain(1)) / diff(xLimMain);
-        xFracEnd   = (zoomEnd   - xLimMain(1)) / diff(xLimMain);
+        % Inset size
+        insetW = axPos(3) * 0.26;
+        insetH = axPos(4) * 0.40;
 
-        % Map to figure-normalized coordinates
-        insetL = axPos(1) + xFracStart * axPos(3) - 0.05;
-        insetW = (xFracEnd - xFracStart) * axPos(3) + 0.06;
-        insetH = axPos(4) * 0.65;
-        insetB = axPos(2) + axPos(4) * 0.20;
+        % Inset x position (right side of subplot)
+        insetL = axPos(1) + axPos(3) * 0.72;
+
+        % Find where y=0 sits in main axes in figure coordinates
+        zeroFrac      = (0 - yLimMain(1)) / diff(yLimMain);
+        zeroFigY      = axPos(2) + zeroFrac * axPos(4);
+
+        % Align inset so its y=0 matches main axes y=0
+        zeroFracInset = (0 - zoomYLims(c,1)) / diff(zoomYLims(c,:));
+        insetB        = zeroFigY - zeroFracInset * insetH;
 
         axIn = axes(fig, 'Position', [insetL insetB insetW insetH]);
+        set(axIn, 'Units', 'normalized');   % lock in normalized units
+        disableDefaultInteractivity(axIn);  % prevent MATLAB from auto-adjusting
 
+        % Plot zoomed segment
         mask_zoom = tAxis >= zoomStart & tAxis <= zoomEnd;
         plot(axIn, tAxis(mask_zoom), y(mask_zoom), ...
             'Color', condColors(c,:), 'LineWidth', 0.8);
@@ -98,12 +110,8 @@ function plot_waveform(cfg, allT0)
             'Color', [1 1 1], ...
             'XColor', [0.2 0.2 0.2], ...
             'YColor', [0.2 0.2 0.2]);
-
-        xticks(axIn, linspace(zoomStart, zoomEnd, 3));
-        xticklabels(axIn, arrayfun(@(v) sprintf('%.0f', v), ...
-            linspace(zoomStart, zoomEnd, 3), 'UniformOutput', false));
         yticks(axIn, [zoomYLims(c,1), 0, zoomYLims(c,2)]);
-        xticklabels(axIn, {});   % no x tick labels
+        xticklabels(axIn, {});
         xlabel(axIn, '');
         ylabel(axIn, '');
     end

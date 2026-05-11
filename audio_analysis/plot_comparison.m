@@ -1,4 +1,4 @@
-function plot_comparison(allStatsTables, conditionNames)
+function plot_comparison(allStatsTables, condNames)
 % PLOT_COMPARISON  Grouped bar plot of absolute mean dB SPL per event and
 % condition, with error bars and significance stars.
 %
@@ -12,16 +12,26 @@ function plot_comparison(allStatsTables, conditionNames)
     yGrp   = cell2mat(cellfun(@(T) T.mean_dB, allStatsTables, 'UniformOutput', false));
     errGrp = cell2mat(cellfun(@(T) T.std_dB,  allStatsTables, 'UniformOutput', false));
 
+    % --- Separate baseline event from the rest ---
+    baseRow  = strcmp(T1.eventID, 'Baseline');
+    plotRows = ~baseRow;
+
+    % Average baseline dB across all conditions for a single reference line
+    baseVals = cellfun(@(T) T.mean_dB(baseRow), allStatsTables);
+    baseline = mean(baseVals);
+
     figure('Position', [100 100 900 500]);
     condColors = [
         0.85  0.92  1.00;   % light blue    — box_closed
         0.25  0.60  0.95;   % medium blue   — box_open
         0.05  0.20  0.60;   % deep navy     — internal_sound
         ];
+    
     bg = bar(x, yGrp, 'grouped');
     for k = 1:nConds
         bg(k).FaceColor = condColors(k,:);
     end
+    
 
     ylabel('Mean dB SPL');
     xtickangle(45);
@@ -31,6 +41,7 @@ function plot_comparison(allStatsTables, conditionNames)
     title('Mean Sound Pressure Level by Event and Condition');
 
     hold on;
+    yline(baseline, '-', 'Baseline');
     for k = 1:nConds
         xpos = bg(k).XEndPoints;
         ytip = bg(k).YEndPoints;
@@ -42,8 +53,9 @@ function plot_comparison(allStatsTables, conditionNames)
             uistack(er, 'bottom');
         end
     end
+    
 
-    legend(bg, strrep(conditionNames, '_', '\_'), 'Location', 'best');
+    legend(bg, strrep(condNames, '_', '\_'), 'Location', 'best');
 
     ylims2  = ylim;
     yrange2 = range(ylims2);

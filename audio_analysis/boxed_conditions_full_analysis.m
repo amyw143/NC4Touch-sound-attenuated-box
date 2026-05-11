@@ -144,19 +144,38 @@ nEvents     = numel(allStats{closedIdx});
 eventIDs    = {allStats{closedIdx}.eventID};
 attenuation = T_open.mean_dB - T_closed.mean_dB;
 
-% --- Print attenuation table ---
-fprintf('\n[ATTENUATION] box_open vspl box_closed\n');
-fprintf('%-20s %10s %10s %10s %10s %6s\n', 'Event', 'Open dB', 'Closed dB', 'Delta dB');
-fprintf('%s\n', repmat('-', 1, 70));
+% --- Per-event paired t-test + Cohen's d (box_open vs box_closed) ---
+pVals    = nan(nEvents, 1);
+cohensD  = nan(nEvents, 1);
+sigStars = cell(nEvents, 1);
 for i = 1:nEvents
-    fprintf('%-20s %10.2f %10.2f %10.2f %10.2f %6s\n', ...
-        eventIDs{i}, T_open.mean_dB(i), T_closed.mean_dB(i), attenuation(i));
+    raw_closed = allStats{closedIdx}(i).raw_dB;
+    raw_open   = allStats{openIdx2}(i).raw_dB;
+    [~, pVals(i)] = ttest(raw_open, raw_closed);
+    d          = raw_open - raw_closed;
+    cohensD(i) = mean(d) / std(d);
+    if     isnan(pVals(i)),   sigStars{i} = 'n/a';
+    elseif pVals(i) < 0.001,  sigStars{i} = '***';
+    elseif pVals(i) < 0.01,   sigStars{i} = '**';
+    elseif pVals(i) < 0.05,   sigStars{i} = '*';
+    else,                     sigStars{i} = 'n.s.';
+    end
 end
 
-plot_attenuation(eventIDs, attenuation, sigStars, cohensD);
+% --- Print attenuation table ---
+fprintf('\n[ATTENUATION] box_open vs box_closed\n');
+fprintf('%-20s %10s %10s %10s %10s %10s %6s\n', 'Event', 'Open dB', 'Closed dB', 'Delta dB', 't(4)', 'd', 'sig');
+fprintf('%s\n', repmat('-', 1, 80));
+for i = 1:nEvents
+    [~, ~, ~, tStats] = ttest(allStats{openIdx2}(i).raw_dB, allStats{closedIdx}(i).raw_dB);
+    fprintf('%-20s %10.2f %10.2f %10.2f %10.2f %10.2f %6s\n', ...
+        eventIDs{i}, T_open.mean_dB(i), T_closed.mean_dB(i), attenuation(i), tStats.tstat, cohensD(i), sigStars{i});
+end
+    
+% plot_attenuation(eventIDs, attenuation, sigStars, cohensD);
 allStatsTables = cellfun(@struct2table, allStats, 'UniformOutput', false);
-plot_comparison(allStatsTables, condNames);
-plot_waveform(cfg, allT0);                                      
-plot_spectrogram(cfg, allEventTiming, allT0);
+% plot_comparison(allStatsTables, condNames);
+% plot_waveform(cfg, allT0);                                      
+% plot_spectrogram(cfg, allEventTiming, allT0);
 
 fprintf('[DONE] Analysis complete.\n');

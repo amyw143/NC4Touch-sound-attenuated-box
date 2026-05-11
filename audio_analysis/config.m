@@ -19,34 +19,33 @@ projectRoot = '/Users/amywong/Documents/MATLAB/nc4touch-data';
 
 % --- Condition 1: Box Closed ---
 cfg.conditions(1).name       = 'box_closed';
-cfg.conditions(1).audioFile  = 'phase_2_2.wav';        % filename only
-cfg.conditions(1).audioStart = datetime('2026-03-09 14:43:12.100', ...
+cfg.conditions(1).audioFile  = 'box_closed_final.wav';        % filename only
+cfg.conditions(1).audioStart = datetime('2026-04-13 10:41:05.100', ...
                                    'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');  % from Audacity
-cfg.conditions(1).eventFile  = 'phase_2_2.json';       % filename only
+cfg.conditions(1).eventFile  = 'box_closed_final.json';       % filename only
 
 % --- Condition 2: Box Open ---
 cfg.conditions(2).name       = 'box_open';
-cfg.conditions(2).audioFile  = 'phase_2b_2.wav';       % filename only
-cfg.conditions(2).audioStart = datetime('2026-03-09 14:34:58.100', ...
+cfg.conditions(2).audioFile  = 'box_open_final_2.wav';       % filename only
+cfg.conditions(2).audioStart = datetime('2026-04-13 11:05:06.100', ...
                                    'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');  % from Audacity
-cfg.conditions(2).eventFile  = 'phase_2b_2.json';      % filename only
+cfg.conditions(2).eventFile  = 'box_open_final_2.json';      % filename only
 
 % --- Condition 3: Internal Sound ---
 cfg.conditions(3).name = 'internal_sound'; 
-cfg.conditions(3).audioFile = 'internal_sound_chamber_4.wav'; 
-cfg.conditions(3).audioStart = datetime('2026-03-13 09:08:53.100', ...
+cfg.conditions(3).audioFile = 'internal_sound_final.wav'; 
+cfg.conditions(3).audioStart = datetime('2026-04-13 10:28:06.100', ...
                                    'InputFormat', 'yyyy-MM-dd HH:mm:ss.SSS');  % from Audacity
-cfg.conditions(3).eventFile  = 'internal_sound_chamber_4.json'; 
+cfg.conditions(3).eventFile  = 'internal_sound_final.json'; 
 %% -------------------------------------------------------------------------
 %% AUTOMATIC — do not edit below this line
 %% -------------------------------------------------------------------------
 
 % --- Directories ---
 cfg.projectRoot  = projectRoot;
-cfg.dataDir      = fullfile(projectRoot, 'data_march');
+cfg.dataDir      = fullfile(projectRoot, 'final_data');
 cfg.calibDir     = fullfile(projectRoot, 'audio_calibration');
 cfg.analysisDir  = fullfile(projectRoot, 'analysis');
-cfg.baselineFile  = fullfile(projectRoot, 'data_march', 'baseline', 'baseline_noise_2.wav');
 
 % --- Calibration ---
 cfg.calibPath      = fullfile(cfg.calibDir, 'calibration_params.mat');
@@ -55,7 +54,6 @@ cfg.calibAudioFile = fullfile(cfg.calibDir, 'sound_calibration_013026.wav');
 
 % --- Analysis settings ---
 cfg.audioBandFilter = [200, 90000];  % Hz
-cfg.baselineMean    = 34.70;         % dB SPL — from baseline recording
 
 % --- Resolve full paths for each condition ---
 for c = 1:numel(cfg.conditions)
